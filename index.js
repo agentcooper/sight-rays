@@ -34,7 +34,6 @@ const drawLine = (start, end) => {
 
 const drawPolygon = (points, color) => {
   context.fillStyle = color;
-
   context.beginPath();
   points.forEach((point, index) => {
     if (index === 0) {
@@ -44,7 +43,6 @@ const drawPolygon = (points, color) => {
     }
   });
   context.closePath();
-
   context.fill();
 };
 
@@ -123,38 +121,77 @@ const isInBounds = point =>
   (point.x >= 0 && point.x <= WIDTH) &&
   (point.y >= 0 && point.y <= HEIGHT);
 
+const drawViewPolygon = (point, lines, color) => {
+  if (!isInBounds(point)) {
+    return;
+  }
+
+  const angles = flatten(
+    lines.map(line => [
+      ...valueWithOffsets(
+        getAngleBetween(line.start, point)
+      ),
+      ...valueWithOffsets(
+        getAngleBetween(line.end, point)
+      )
+    ])
+  );
+
+  const sortedAngles = Array.from(angles).sort((a, b) => a - b);
+
+  const points = sortedAngles.map(
+    angle => intersectRayWithLines(point, angle, lines)
+  );
+
+  drawPolygon(points, color);
+};
+
+const drawCircle = (point, color) => {
+  context.fillStyle = color;
+  context.beginPath();
+  context.arc(point.x, point.y, 5, 0, 2 * Math.PI);
+  context.stroke();
+  context.closePath();
+  context.fill();
+};
+
+const drawRectangle = (...args) => {
+  context.fillStyle = '#555555';
+  context.rect(...args);
+  context.fill();
+};
+
 const render = state => {
-  const { player, mouse, lines } = state;
+  const { mouse, player, enemies, lines, t } = state;
 
   player.x = mouse.x;
   player.y = mouse.y;
 
   context.clearRect(0, 0, WIDTH, HEIGHT);
 
-  if (isInBounds(player)) {
-    const angles = flatten(
-      lines.map(line => [
-        ...valueWithOffsets(
-          getAngleBetween(line.start, player)
-        ),
-        ...valueWithOffsets(
-          getAngleBetween(line.end, player)
-        )
-      ])
-    );
+  context.globalCompositeOperation = 'source-over';
 
-    const sortedAngles = Array.from(angles).sort((a, b) => a - b);
+  drawViewPolygon(player, lines, '#FFFFFF');
 
-    const points = sortedAngles.map(
-      angle => intersectRayWithLines(player, angle, lines)
-    );
-
-    drawPolygon(points, '#F00000');
-  }
+  context.globalCompositeOperation = 'source-atop';
 
   lines.forEach(line => {
+    context.lineWidth = 4;
     drawLine(line.start, line.end);
   });
+
+  enemies.forEach(enemy => {
+    enemy.x = enemy.focusX + Math.sin(t * enemy.speed) * enemy.radius;
+    enemy.y = enemy.focusY + Math.cos(t * enemy.speed) * enemy.radius;
+
+    drawCircle(enemy, '#ff0000');
+  });
+
+  drawCircle(player, '#00ff00');
+
+  context.globalCompositeOperation = 'destination-over';
+
+  drawRectangle(0, 0, WIDTH, HEIGHT);
 }
 
 const state = {
@@ -162,6 +199,23 @@ const state = {
     x: 100,
     y: 100,
   },
+
+  enemies: [
+    {
+      focusX: 100,
+      focusY: 100,
+      radius: 40,
+      speed: 0.1
+    },
+    {
+      focusX: 500,
+      focusY: 300,
+      radius: 50,
+      speed: 0.05,
+    },
+  ],
+
+  t: 0,
 
   mouse: {
     x: 0,
@@ -184,6 +238,7 @@ const state = {
 };
 
 (function go() {
+  state.t += 1;
   render(state);
   window.requestAnimationFrame(go);
 })();

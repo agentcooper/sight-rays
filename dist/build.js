@@ -51,7 +51,6 @@ var drawLine = function drawLine(start, end) {
 
 var drawPolygon = function drawPolygon(points, color) {
   context.fillStyle = color;
-
   context.beginPath();
   points.forEach(function (point, index) {
     if (index === 0) {
@@ -61,7 +60,6 @@ var drawPolygon = function drawPolygon(points, color) {
     }
   });
   context.closePath();
-
   context.fill();
 };
 
@@ -127,10 +125,47 @@ var isInBounds = function isInBounds(point) {
   return point.x >= 0 && point.x <= WIDTH && point.y >= 0 && point.y <= HEIGHT;
 };
 
+var drawViewPolygon = function drawViewPolygon(point, lines, color) {
+  if (!isInBounds(point)) {
+    return;
+  }
+
+  var angles = flatten(lines.map(function (line) {
+    return [].concat(_toConsumableArray(valueWithOffsets(getAngleBetween(line.start, point))), _toConsumableArray(valueWithOffsets(getAngleBetween(line.end, point))));
+  }));
+
+  var sortedAngles = Array.from(angles).sort(function (a, b) {
+    return a - b;
+  });
+
+  var points = sortedAngles.map(function (angle) {
+    return intersectRayWithLines(point, angle, lines);
+  });
+
+  drawPolygon(points, color);
+};
+
+var drawCircle = function drawCircle(point, color) {
+  context.fillStyle = color;
+  context.beginPath();
+  context.arc(point.x, point.y, 5, 0, 2 * Math.PI);
+  context.stroke();
+  context.closePath();
+  context.fill();
+};
+
+var drawRectangle = function drawRectangle() {
+  context.fillStyle = '#555555';
+  context.rect.apply(context, arguments);
+  context.fill();
+};
+
 var render = function render(state) {
-  var player = state.player;
   var mouse = state.mouse;
+  var player = state.player;
+  var enemies = state.enemies;
   var lines = state.lines;
+  var t = state.t;
 
 
   player.x = mouse.x;
@@ -138,25 +173,29 @@ var render = function render(state) {
 
   context.clearRect(0, 0, WIDTH, HEIGHT);
 
-  if (isInBounds(player)) {
-    var angles = flatten(lines.map(function (line) {
-      return [].concat(_toConsumableArray(valueWithOffsets(getAngleBetween(line.start, player))), _toConsumableArray(valueWithOffsets(getAngleBetween(line.end, player))));
-    }));
+  context.globalCompositeOperation = 'source-over';
 
-    var sortedAngles = Array.from(angles).sort(function (a, b) {
-      return a - b;
-    });
+  drawViewPolygon(player, lines, '#FFFFFF');
 
-    var points = sortedAngles.map(function (angle) {
-      return intersectRayWithLines(player, angle, lines);
-    });
-
-    drawPolygon(points, '#F00000');
-  }
+  context.globalCompositeOperation = 'source-atop';
 
   lines.forEach(function (line) {
+    context.lineWidth = 4;
     drawLine(line.start, line.end);
   });
+
+  enemies.forEach(function (enemy) {
+    enemy.x = enemy.focusX + Math.sin(t * enemy.speed) * enemy.radius;
+    enemy.y = enemy.focusY + Math.cos(t * enemy.speed) * enemy.radius;
+
+    drawCircle(enemy, '#ff0000');
+  });
+
+  drawCircle(player, '#00ff00');
+
+  context.globalCompositeOperation = 'destination-over';
+
+  drawRectangle(0, 0, WIDTH, HEIGHT);
 };
 
 var state = {
@@ -164,6 +203,20 @@ var state = {
     x: 100,
     y: 100
   },
+
+  enemies: [{
+    focusX: 100,
+    focusY: 100,
+    radius: 40,
+    speed: 0.1
+  }, {
+    focusX: 500,
+    focusY: 300,
+    radius: 50,
+    speed: 0.05
+  }],
+
+  t: 0,
 
   mouse: {
     x: 0,
@@ -179,6 +232,7 @@ var state = {
 };
 
 (function go() {
+  state.t += 1;
   render(state);
   window.requestAnimationFrame(go);
 })();
