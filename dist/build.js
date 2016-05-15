@@ -187,8 +187,8 @@ node.addEventListener('mousemove', function (event) {
   var mouse = state.mouse;
 
 
-  mouse.x = event.clientX;
-  mouse.y = event.clientY;
+  mouse.x = event.offsetX;
+  mouse.y = event.offsetY;
 });
 
 },{}]},{},[1]);

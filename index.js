@@ -191,6 +191,6 @@ const state = {
 node.addEventListener('mousemove', event => {
   const { mouse } = state;
 
-  mouse.x = event.clientX;
-  mouse.y = event.clientY;
+  mouse.x = event.offsetX;
+  mouse.y = event.offsetY;
 });
