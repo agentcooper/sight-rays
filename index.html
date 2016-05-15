@@ -21,6 +21,14 @@ const flatten = arr =>
   arr.reduce(
     (res, item) => res.concat(item), []);
 
+const vector = (x, y) => ({ x: x, y: y });
+
+const add = (v, u) => vector(v.x + u.x, v.y + u.y);
+const subtract = (v, u) => vector(v.x - u.x, v.y - u.y);
+
+const multiply = (scalar, v) => vector(scalar * v.x, scalar * v.y);
+const cross = (v, u) => v.x * u.y - v.y * u.x;
+
 const buildLine = (x1, y1, x2, y2) => ({
   start: { x: x1, y: y1 },
   end: { x: x2, y: y2 }
@@ -33,8 +41,9 @@ const drawLine = (start, end) => {
   context.stroke();
 };
 
-const drawPolygon = (points, color = '#f00') => {
+const drawPolygon = (points, color) => {
   context.fillStyle = color;
+
   context.beginPath();
   points.forEach((point, index) => {
     if (index === 0) {
@@ -44,16 +53,9 @@ const drawPolygon = (points, color = '#f00') => {
     }
   });
   context.closePath();
+
   context.fill();
 };
-
-const vector = (x, y) => ({ x: x, y: y });
-
-const add = (v, u) => vector(v.x + u.x, v.y + u.y);
-const subtract = (v, u) => vector(v.x - u.x, v.y - u.y);
-
-const multiply = (scalar, v) => vector(scalar * v.x, scalar * v.y);
-const cross = (u, v) => u.x * v.y - u.y * v.x;
 
 const intersectSegments = (segment1, segment2) => {
   // segment1: p + t * r
@@ -119,11 +121,12 @@ const getAngleBetween = (pointA, pointB) =>
     pointA.x - pointB.x
   );
 
-const getOffsets = (value, offset = ANGLE_OFFSET) => [
-  value - offset,
-  value,
-  value + offset
-];
+const valueWithOffsets = (value, offset = ANGLE_OFFSET) =>
+  [
+    value - offset,
+    value,
+    value + offset
+  ];
 
 const isInBounds = point =>
   (point.x >= 0 && point.x <= WIDTH) &&
@@ -140,20 +143,22 @@ const render = state => {
   if (isInBounds(player)) {
     const angles = flatten(
       lines.map(line => [
-        ...getOffsets(
+        ...valueWithOffsets(
           getAngleBetween(line.start, player)
         ),
-        ...getOffsets(
+        ...valueWithOffsets(
           getAngleBetween(line.end, player)
         )
       ])
-    ).sort((a, b) => a - b);
+    );
 
-    const points = angles.map(
+    const sortedAngles = Array.from(angles).sort((a, b) => a - b);
+
+    const points = sortedAngles.map(
       angle => intersectRayWithLines(player, angle, lines)
     );
 
-    drawPolygon(points);
+    drawPolygon(points, '#F00000');
   }
 
   lines.forEach(line => {
