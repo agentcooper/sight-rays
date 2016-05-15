@@ -1,0 +1,197 @@
+<canvas id="canvas" width="800" height="400"></canvas>
+
+<script>
+'use strict';
+
+const node = document.querySelector('#canvas');
+const context = canvas.getContext('2d');
+
+const WIDTH = 800;
+const HEIGHT = 400;
+
+const ANGLE_OFFSET = 0.0001;
+
+const flatten = arr =>
+  arr.reduce(
+    (res, item) => res.concat(item), []);
+
+const buildLine = (x1, y1, x2, y2) => ({
+  start: { x: x1, y: y1 },
+  end: { x: x2, y: y2 }
+});
+
+const drawLine = (start, end) => {
+  context.beginPath();
+  context.moveTo(start.x, start.y);
+  context.lineTo(end.x, end.y);
+  context.stroke();
+};
+
+const drawPolygon = (points, color = '#f00') => {
+  context.fillStyle = color;
+  context.beginPath();
+  points.forEach((point, index) => {
+    if (index === 0) {
+      context.moveTo(point.x, point.y);
+    } else {
+      point && context.lineTo(point.x, point.y);
+    }
+  });
+  context.closePath();
+  context.fill();
+};
+
+const getIntersection = (ray, segment) => {
+  const r_px = ray.a.x;
+  const r_py = ray.a.y;
+
+  const r_dx = ray.b.x - ray.a.x;
+  const r_dy = ray.b.y - ray.a.y;
+
+  const s_px = segment.a.x;
+  const s_py = segment.a.y;
+
+  const s_dx = segment.b.x - segment.a.x;
+  const s_dy = segment.b.y - segment.a.y;
+
+  // check if parallel
+  if (r_dx * s_dy == r_dy * s_dx) {
+    return null;
+  }
+
+  const T2 =
+    (r_dx * (s_py - r_py) + r_dy * (r_px - s_px)) /
+    (s_dx * r_dy - s_dy * r_dx);
+
+  const T1 = r_dx === 0 ?
+    (s_px + s_dx * T2 - r_px) / r_dx :
+    (s_py + s_dy * T2 - r_py) / r_dy;
+
+  if (T1 < 0) {
+    return null;
+  }
+
+  if (T2 < 0 || T2 > 1) {
+    return null;
+  }
+
+  return {
+    x: r_px + r_dx * T1,
+    y: r_py + r_dy * T1,
+
+    param: T1
+  };
+};
+
+const castRay = (start, angle, lines) => {
+  const end = {
+    x: start.x + Math.cos(angle) * 1000,
+    y: start.y + Math.sin(angle) * 1000,
+  };
+
+  let intersectFound = null;
+
+  lines.forEach(line => {
+    const intersect = getIntersection(
+      { a: start, b: end },
+      { a: line.start, b: line.end }
+    );
+
+    if (!intersect) {
+      return;
+    }
+
+    if (!intersectFound || intersect.param < intersectFound.param) {
+      intersectFound = intersect;
+    }
+  });
+
+  return intersectFound;
+};
+
+const getAngleBetween = (pointA, pointB) =>
+  Math.atan2(
+    pointA.y - pointB.y,
+    pointA.x - pointB.x
+  );
+
+const getOffsets = (value, offset = ANGLE_OFFSET) => [
+  value - offset,
+  value,
+  value + offset
+];
+
+const isInBounds = point =>
+  (point.x >= 0 && point.x <= WIDTH) &&
+  (point.y >= 0 && point.y <= HEIGHT);
+
+const render = state => {
+  const { player, mouse, lines } = state;
+
+  player.x = mouse.x;
+  player.y = mouse.y;
+
+  context.clearRect(0, 0, WIDTH, HEIGHT);
+
+  if (isInBounds(player)) {
+    const angles = flatten(
+      lines.map(line => [
+        ...getOffsets(
+          getAngleBetween(line.start, player)
+        ),
+        ...getOffsets(
+          getAngleBetween(line.end, player)
+        )
+      ])
+    ).sort((a, b) => a - b);
+
+    const points = angles.map(
+      angle => castRay(player, angle, lines)
+    );
+
+    drawPolygon(points);
+  }
+
+  lines.forEach(line => {
+    drawLine(line.start, line.end);
+  });
+}
+
+const state = {
+  player: {
+    x: 100,
+    y: 100,
+  },
+
+  mouse: {
+    x: 0,
+    y: 0,
+  },
+
+  lines: [
+    // screen
+    buildLine(0, 0, WIDTH, 0),
+    buildLine(0, 0, 0, HEIGHT),
+    buildLine(WIDTH, 0, WIDTH, HEIGHT),
+    buildLine(0, HEIGHT, WIDTH, HEIGHT),
+
+    // walls
+    buildLine(200, 200, 100, 200),
+    buildLine(400, 100, 300, 300),
+    buildLine(500, 200, 700, 300),
+    buildLine(550, 50, 700, 200)
+  ]
+};
+
+(function go() {
+  render(state);
+  window.requestAnimationFrame(go);
+})();
+
+node.addEventListener('mousemove', event => {
+  const { mouse } = state;
+
+  mouse.x = event.clientX;
+  mouse.y = event.clientY;
+});
+</script>
