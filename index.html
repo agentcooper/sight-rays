@@ -47,60 +47,58 @@ const drawPolygon = (points, color = '#f00') => {
   context.fill();
 };
 
-const getIntersection = (ray, segment) => {
-  const r_px = ray.a.x;
-  const r_py = ray.a.y;
+const vector = (x, y) => ({ x: x, y: y });
 
-  const r_dx = ray.b.x - ray.a.x;
-  const r_dy = ray.b.y - ray.a.y;
+const add = (v, u) => vector(v.x + u.x, v.y + u.y);
+const subtract = (v, u) => vector(v.x - u.x, v.y - u.y);
 
-  const s_px = segment.a.x;
-  const s_py = segment.a.y;
+const multiply = (scalar, v) => vector(scalar * v.x, scalar * v.y);
+const cross = (u, v) => u.x * v.y - u.y * v.x;
 
-  const s_dx = segment.b.x - segment.a.x;
-  const s_dy = segment.b.y - segment.a.y;
+const intersectSegments = (segment1, segment2) => {
+  // segment1: p + t * r
+  const p = segment1.start;
+  const r = subtract(segment1.end, segment1.start);
 
-  // check if parallel
-  if (r_dx * s_dy == r_dy * s_dx) {
+  // segment2: q + u * s
+  const q = segment2.start;
+  const s = subtract(segment2.end, segment2.start);
+
+  const tNumerator = cross(subtract(q, p), s);
+  const uNumerator = cross(subtract(q, p), r);
+
+  const denominator = cross(r, s);
+
+  // parallel
+  if (denominator === 0) {
     return null;
   }
 
-  const T2 =
-    (r_dx * (s_py - r_py) + r_dy * (r_px - s_px)) /
-    (s_dx * r_dy - s_dy * r_dx);
+  const t = tNumerator / denominator;
+  const u = uNumerator / denominator;
 
-  const T1 = r_dx === 0 ?
-    (s_px + s_dx * T2 - r_px) / r_dx :
-    (s_py + s_dy * T2 - r_py) / r_dy;
-
-  if (T1 < 0) {
-    return null;
+  if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+    return Object.assign(
+      add(p, multiply(t, r)),
+      { param: t }
+    );
   }
 
-  if (T2 < 0 || T2 > 1) {
-    return null;
-  }
-
-  return {
-    x: r_px + r_dx * T1,
-    y: r_py + r_dy * T1,
-
-    param: T1
-  };
+  return null;
 };
 
-const castRay = (start, angle, lines) => {
-  const end = {
-    x: start.x + Math.cos(angle) * 1000,
-    y: start.y + Math.sin(angle) * 1000,
-  };
+const intersectRayWithLines = (start, angle, lines) => {
+  const end = vector(
+    start.x + Math.cos(angle) * 1000,
+    start.y + Math.sin(angle) * 1000
+  );
 
   let intersectFound = null;
 
   lines.forEach(line => {
-    const intersect = getIntersection(
-      { a: start, b: end },
-      { a: line.start, b: line.end }
+    const intersect = intersectSegments(
+      { start: start, end: end },
+      { start: line.start, end: line.end }
     );
 
     if (!intersect) {
@@ -152,7 +150,7 @@ const render = state => {
     ).sort((a, b) => a - b);
 
     const points = angles.map(
-      angle => castRay(player, angle, lines)
+      angle => intersectRayWithLines(player, angle, lines)
     );
 
     drawPolygon(points);
